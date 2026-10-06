@@ -1,7 +1,7 @@
 // GRUPOLEADS — Assistente Inteligente Integrado ao WhatsApp Web
 // Permite conectar a base de lotes ao WhatsApp Web para ir adicionando contatos com cadência segura e 1 clique.
 
-const BACKEND_URL = 'http://localhost:3001/api';
+const BACKEND_URL = 'https://grupoleads-api.onrender.com/api';
 
 interface BatchContact {
   id: string;

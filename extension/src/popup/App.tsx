@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { FilterOptions, FilterResultStats, RawScrapedContact } from '@grupoleads/shared';
 
-const BACKEND_API_URL = 'http://localhost:3001/api';
+const BACKEND_API_URL = 'https://grupoleads-api.onrender.com/api';
 const DASHBOARD_URL = 'http://localhost:5173';
 
 type ViewMode = 'login' | 'main' | 'filters' | 'filter_result' | 'success';

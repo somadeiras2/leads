@@ -10,7 +10,8 @@
   ],
   "host_permissions": [
     "https://web.whatsapp.com/*",
-    "http://localhost:3001/*"
+    "http://localhost:3001/*",
+    "https://*.onrender.com/*"
   ],
   "action": {
     "default_popup": "index.html",

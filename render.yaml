@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: grupoleads-backend
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build --workspace=@grupoleads/shared && npm run build --workspace=@grupoleads/backend
+    startCommand: npm run start --workspace=@grupoleads/backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false

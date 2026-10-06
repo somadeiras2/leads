@@ -1,0 +1,266 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  name         String
+  email        String        @unique
+  passwordHash String        @map("password_hash")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  contacts     Contact[]
+  groups       Group[]
+  tags         Tag[]
+  collections  Collection[]
+  campaigns    Campaign[]
+  exports      Export[]
+  settings     Settings?
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Contact {
+  id              String           @id @default(uuid())
+  userId          String           @map("user_id")
+  name            String
+  phone           String
+  identifier      String?
+  status          String           @default("NOVO")
+  notes           String?
+  sourceGroup     String?          @map("source_group")
+  sourceGroupId   String?          @map("source_group_id")
+  lastCollectedAt DateTime?        @map("last_collected_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  groups          GroupContact[]
+  tags            ContactTag[]
+  batchContacts   BatchContact[]
+  campaignContacts CampaignContact[]
+
+  @@unique([userId, phone])
+  @@index([userId, status])
+  @@index([userId, phone])
+  @@map("contacts")
+}
+
+model Group {
+  id              String         @id @default(uuid())
+  userId          String         @map("user_id")
+  name            String
+  waGroupId       String?        @map("wa_group_id")
+  description     String?
+  lastCollectedAt DateTime?      @map("last_collected_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contacts        GroupContact[]
+  collections     Collection[]
+  campaignsSource Campaign[]     @relation("SourceGroup")
+  campaignsDest   Campaign[]     @relation("DestGroup")
+
+  @@unique([userId, name])
+  @@map("groups")
+}
+
+model GroupContact {
+  id        String   @id @default(uuid())
+  groupId   String   @map("group_id")
+  contactId String   @map("contact_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, contactId])
+  @@index([groupId])
+  @@index([contactId])
+  @@map("group_contacts")
+}
+
+model Tag {
+  id        String       @id @default(uuid())
+  userId    String       @map("user_id")
+  name      String
+  color     String?      @default("#3b82f6")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contacts  ContactTag[]
+
+  @@unique([userId, name])
+  @@map("tags")
+}
+
+model ContactTag {
+  id        String   @id @default(uuid())
+  contactId String   @map("contact_id")
+  tagId     String   @map("tag_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, tagId])
+  @@index([contactId])
+  @@index([tagId])
+  @@map("contact_tags")
+}
+
+model Collection {
+  id              String           @id @default(uuid())
+  userId          String           @map("user_id")
+  groupId         String           @map("group_id")
+  groupName       String           @map("group_name")
+  totalFound      Int              @default(0) @map("total_found")
+  newCount        Int              @default(0) @map("new_count")
+  duplicatesCount Int              @default(0) @map("duplicates_count")
+  ignoredCount    Int              @default(0) @map("ignored_count")
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group           Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  items           CollectionItem[]
+
+  @@map("collections")
+}
+
+model CollectionItem {
+  id           String     @id @default(uuid())
+  collectionId String     @map("collection_id")
+  name         String
+  phone        String
+  identifier   String?
+  status       String     @default("PROCESSADO")
+  reason       String?
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@map("collection_items")
+}
+
+model Campaign {
+  id                 String            @id @default(uuid())
+  userId             String            @map("user_id")
+  name               String
+  targetGoal         Int               @default(300) @map("target_goal")
+  batchSize          Int               @default(50) @map("batch_size")
+  status             String            @default("EM_ANDAMENTO")
+  sourceGroupId      String?           @map("source_group_id")
+  destinationGroupId String?           @map("destination_group_id")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceGroup        Group?            @relation("SourceGroup", fields: [sourceGroupId], references: [id])
+  destinationGroup   Group?            @relation("DestGroup", fields: [destinationGroupId], references: [id])
+  batches            Batch[]
+  campaignContacts   CampaignContact[]
+
+  @@map("campaigns")
+}
+
+model CampaignContact {
+  id         String   @id @default(uuid())
+  campaignId String   @map("campaign_id")
+  contactId  String   @map("contact_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact    Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, contactId])
+  @@map("campaign_contacts")
+}
+
+model Batch {
+  id          String         @id @default(uuid())
+  campaignId  String         @map("campaign_id")
+  batchNumber Int            @map("batch_number")
+  targetSize  Int            @default(50) @map("target_size")
+  status      String         @default("PENDENTE")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  campaign    Campaign       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contacts    BatchContact[]
+
+  @@unique([campaignId, batchNumber])
+  @@map("batches")
+}
+
+model BatchContact {
+  id          String    @id @default(uuid())
+  batchId     String    @map("batch_id")
+  contactId   String    @map("contact_id")
+  status      String    @default("PENDENTE")
+  processedAt DateTime? @map("processed_at")
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  batch       Batch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  contact     Contact   @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, contactId])
+  @@index([batchId, status])
+  @@map("batch_contacts")
+}
+
+model Export {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  format    String   @default("XLSX")
+  scope     String   @default("ALL")
+  rowCount  Int      @default(0) @map("row_count")
+  fileName  String   @map("file_name")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("exports")
+}
+
+model Settings {
+  id                          String   @id @default(uuid())
+  userId                      String   @unique @map("user_id")
+  ignoreFirstN                Int      @default(100) @map("ignore_first_n")
+  ignoreAdmins                Boolean  @default(true) @map("ignore_admins")
+  ignoreDuplicates            Boolean  @default(true) @map("ignore_duplicates")
+  ignoreAlreadyRegistered     Boolean  @default(true) @map("ignore_already_registered")
+  ignoreAlreadyInDestination  Boolean  @default(true) @map("ignore_already_in_destination")
+  ignoreWithoutIdentifier     Boolean  @default(true) @map("ignore_without_identifier")
+  defaultBatchSize            Int      @default(50) @map("default_batch_size")
+  demoModeActive              Boolean  @default(false) @map("demo_mode_active")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("settings")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  details   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, action])
+  @@map("audit_logs")
+}

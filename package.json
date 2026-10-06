@@ -1,0 +1,31 @@
+{
+  "name": "grupoleads",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GRUPOLEADS - Organize seus contatos. Gerencie seus leads.",
+  "workspaces": [
+    "shared",
+    "backend",
+    "dashboard",
+    "extension"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=@grupoleads/backend",
+    "dev:dashboard": "npm run dev --workspace=@grupoleads/dashboard",
+    "dev:extension": "npm run dev --workspace=@grupoleads/extension",
+    "build": "npm run build --workspaces --if-present",
+    "build:all": "npm run build --workspace=@grupoleads/shared && npm run build --workspace=@grupoleads/backend && npm run build --workspace=@grupoleads/dashboard && npm run build --workspace=@grupoleads/extension",
+    "db:push:supabase": "npm run db:push:supabase --workspace=@grupoleads/backend",
+    "package:extension": "node scripts/package-extension.js",
+    "test": "npm run test --workspace=@grupoleads/backend"
+  },
+  "keywords": [
+    "grupoleads",
+    "leads",
+    "crm",
+    "chrome-extension",
+    "whatsapp-crm"
+  ],
+  "author": "GRUPOLEADS Team",
+  "license": "MIT"
+}

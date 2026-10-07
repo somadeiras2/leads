@@ -29,16 +29,21 @@ import { ContactDTO, GroupDTO, TagDTO } from '@grupoleads/shared';
 
 interface ContactsCRMProps {
   onOpenCreateCampaignWithContacts?: (contactIds: string[]) => void;
+  initialGroupId?: string;
 }
 
-export const ContactsCRM: React.FC<ContactsCRMProps> = ({ onOpenCreateCampaignWithContacts }) => {
+export const ContactsCRM: React.FC<ContactsCRMProps> = ({
+  onOpenCreateCampaignWithContacts,
+  initialGroupId
+}) => {
   const [contacts, setContacts] = useState<ContactDTO[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [groups, setGroups] = useState<GroupDTO[]>([]);
-  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [selectedGroupId, setSelectedGroupId] = useState(initialGroupId || '');
+  const [selectedTagId, setSelectedTagId] = useState('');
   const [tags, setTags] = useState<TagDTO[]>([]);
 
   // Seleção múltipla para criação de lotes ou exportação
@@ -71,6 +76,7 @@ export const ContactsCRM: React.FC<ContactsCRMProps> = ({ onOpenCreateCampaignWi
         search,
         status: statusFilter === 'TODOS' ? undefined : statusFilter,
         groupId: selectedGroupId || undefined,
+        tagId: selectedTagId || undefined,
         page,
         limit: limitToUse
       });
@@ -101,8 +107,14 @@ export const ContactsCRM: React.FC<ContactsCRMProps> = ({ onOpenCreateCampaignWi
   }, []);
 
   useEffect(() => {
+    if (initialGroupId !== undefined) {
+      setSelectedGroupId(initialGroupId);
+    }
+  }, [initialGroupId]);
+
+  useEffect(() => {
     fetchContacts(1);
-  }, [search, statusFilter, selectedGroupId]);
+  }, [search, statusFilter, selectedGroupId, selectedTagId]);
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -241,7 +253,20 @@ export const ContactsCRM: React.FC<ContactsCRMProps> = ({ onOpenCreateCampaignWi
             <option value="">Todos os Grupos</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.name}
+                📁 {g.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={selectedTagId}
+            onChange={(e) => setSelectedTagId(e.target.value)}
+            className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-sm"
+          >
+            <option value="">Todas as Etiquetas</option>
+            {tags.map((t) => (
+              <option key={t.id} value={t.id}>
+                🏷️ {t.name}
               </option>
             ))}
           </select>

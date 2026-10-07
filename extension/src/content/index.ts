@@ -13,15 +13,34 @@ if (document.readyState === 'loading') {
 
 // 1. Detectar nome do grupo ativo
 export function detectCurrentGroupName(): string {
-  // Procura no cabeçalho da conversa aberta
+  const genericTitles = [
+    'dados do grupo',
+    'informações do grupo',
+    'group info',
+    'dados do contato',
+    'pesquisar',
+    'pesquisar...',
+    'ver tudo',
+    'membros do grupo'
+  ];
+
+  const isValidName = (str?: string | null): boolean => {
+    if (!str) return false;
+    const clean = str.trim();
+    if (clean.length < 2) return false;
+    if (clean.includes('+') || clean.includes('online') || clean.includes('visto por último') || clean.includes('digitando...')) return false;
+    if (genericTitles.includes(clean.toLowerCase())) return false;
+    return true;
+  };
+
+  // Procura no cabeçalho da conversa aberta (chat principal)
   const header = document.querySelector('header');
   if (header) {
     const titleCandidates = header.querySelectorAll('span[title], div[role="button"] span, span[dir="auto"]');
     for (const el of titleCandidates) {
       const text = el.getAttribute('title') || el.textContent?.trim();
-      // Ignora status de visto por último ou listas de números
-      if (text && !text.includes('+') && !text.includes('online') && !text.includes('visto por último') && text.length > 1) {
-        return text;
+      if (isValidName(text)) {
+        return text!.trim();
       }
     }
   }
@@ -29,10 +48,12 @@ export function detectCurrentGroupName(): string {
   // Procura no painel lateral de dados do grupo (se estiver aberto)
   const drawer = document.querySelector('section, div[data-testid="chat-info-drawer"]');
   if (drawer) {
-    const nameEl = drawer.querySelector('span[title], h2, div[title]');
-    if (nameEl) {
-      const text = nameEl.getAttribute('title') || nameEl.textContent?.trim();
-      if (text && text.length > 1) return text;
+    const candidates = drawer.querySelectorAll('h2, div[data-testid*="title"], span[title], span[dir="auto"]');
+    for (const el of candidates) {
+      const text = el.getAttribute('title') || el.textContent?.trim();
+      if (isValidName(text)) {
+        return text!.trim();
+      }
     }
   }
 

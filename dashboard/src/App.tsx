@@ -37,6 +37,7 @@ export const App: React.FC = () => {
   const [isCampaignModalOpen, setIsCampaignModalOpen] = useState(false);
   const [campaignPrefillContactIds, setCampaignPrefillContactIds] = useState<string[]>([]);
   const [campaignPrefillGroupId, setCampaignPrefillGroupId] = useState<string | undefined>();
+  const [crmPrefillGroupId, setCrmPrefillGroupId] = useState<string | undefined>();
 
   const fetchStats = async () => {
     setIsStatsLoading(true);
@@ -126,6 +127,7 @@ export const App: React.FC = () => {
         onSelectTab={(tab) => {
           setActiveTab(tab);
           if (tab !== 'batches') setActiveBatchId(null);
+          if (tab !== 'crm') setCrmPrefillGroupId(undefined);
         }}
       />
 
@@ -156,6 +158,7 @@ export const App: React.FC = () => {
 
           {activeTab === 'crm' && (
             <ContactsCRM
+              initialGroupId={crmPrefillGroupId}
               onOpenCreateCampaignWithContacts={(contactIds) => {
                 setCampaignPrefillContactIds(contactIds);
                 setCampaignPrefillGroupId(undefined);
@@ -174,6 +177,7 @@ export const App: React.FC = () => {
                 setActiveTab('campaigns');
               }}
               onFilterContactsByGroup={(groupId) => {
+                setCrmPrefillGroupId(groupId);
                 setActiveTab('crm');
               }}
               onExportGroup={(groupId) => {

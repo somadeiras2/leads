@@ -39,6 +39,8 @@ export const collectContactsSchema = z.object({
   groupName: z.string().min(1),
   waGroupId: z.string().optional(),
   destinationGroupId: z.string().optional().nullable(),
+  segment: z.string().optional().nullable(),
+  tagName: z.string().optional().nullable(),
   filters: filterOptionsSchema,
   rawContacts: z.array(
     z.object({

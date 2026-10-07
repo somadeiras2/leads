@@ -104,7 +104,9 @@ export class ContactService {
     rawContacts: RawScrapedContact[],
     filters: FilterOptions,
     waGroupId?: string,
-    destinationGroupId?: string | null
+    destinationGroupId?: string | null,
+    segment?: string | null,
+    tagName?: string | null
   ) {
     // Garante que o grupo de origem existe
     let group = await prisma.group.findFirst({
@@ -117,6 +119,7 @@ export class ContactService {
           userId,
           name: groupName,
           waGroupId: waGroupId || null,
+          description: segment || null,
           lastCollectedAt: new Date()
         }
       });
@@ -125,9 +128,28 @@ export class ContactService {
         where: { id: group.id },
         data: {
           lastCollectedAt: new Date(),
+          description: segment || group.description,
           waGroupId: waGroupId || group.waGroupId
         }
       });
+    }
+
+    // Cria ou recupera a etiqueta de segmentação
+    const targetTagName = tagName?.trim() || segment?.trim();
+    let tagId: string | null = null;
+    if (targetTagName) {
+      const tag = await prisma.tag.upsert({
+        where: {
+          userId_name: { userId, name: targetTagName }
+        },
+        update: {},
+        create: {
+          userId,
+          name: targetTagName,
+          color: '#3b82f6'
+        }
+      });
+      tagId = tag.id;
     }
 
     const { stats, eligibleContacts } = await this.previewFiltering(
@@ -164,6 +186,8 @@ export class ContactService {
           where: { id: existing.id },
           data: {
             lastCollectedAt: now,
+            sourceGroup: group.name,
+            sourceGroupId: group.id,
             name: (existing.name === 'Sem Nome' || !existing.name) && item.name ? item.name : existing.name
           }
         });
@@ -198,6 +222,23 @@ export class ContactService {
         },
         update: {}
       });
+
+      // Associa a etiqueta (tag) de segmentação ao contato
+      if (tagId) {
+        await prisma.contactTag.upsert({
+          where: {
+            contactId_tagId: {
+              contactId,
+              tagId
+            }
+          },
+          create: {
+            contactId,
+            tagId
+          },
+          update: {}
+        });
+      }
     }
 
     // Registra a coleta no histórico

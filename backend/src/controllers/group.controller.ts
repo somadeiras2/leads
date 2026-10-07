@@ -34,6 +34,15 @@ export class GroupController {
     }
   }
 
+  static async update(req: AuthenticatedRequest, res: Response) {
+    try {
+      const group = await GroupService.updateGroup(req.user!.id, req.params.id, req.body);
+      res.json(group);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   static async delete(req: AuthenticatedRequest, res: Response) {
     try {
       await GroupService.deleteGroup(req.user!.id, req.params.id);

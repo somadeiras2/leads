@@ -56,6 +56,7 @@ router.post('/contacts/collect', validateBody(collectContactsSchema), ContactCon
 router.get('/groups', GroupController.list);
 router.get('/groups/:id', GroupController.getById);
 router.post('/groups', validateBody(groupCreateSchema), GroupController.create);
+router.put('/groups/:id', GroupController.update);
 router.delete('/groups/:id', GroupController.delete);
 
 // Tags

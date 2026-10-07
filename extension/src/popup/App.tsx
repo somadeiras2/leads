@@ -58,6 +58,11 @@ export const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
 
+  // Segmentação & Etiqueta de Origem
+  const [customGroupName, setCustomGroupName] = useState('');
+  const [segmentName, setSegmentName] = useState('');
+  const [tagName, setTagName] = useState('');
+
   const checkWhatsAppConnection = () => {
     if (typeof chrome !== 'undefined' && chrome.tabs) {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -309,7 +314,9 @@ export const App: React.FC = () => {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
-          groupName: currentGroup,
+          groupName: customGroupName.trim() || currentGroup,
+          segment: segmentName.trim() || undefined,
+          tagName: tagName.trim() || segmentName.trim() || undefined,
           filters,
           rawContacts: contactsToSave
         })
@@ -725,12 +732,68 @@ export const App: React.FC = () => {
               />
             </div>
 
+            {/* Segmentação & Identificação do Grupo */}
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-2">
+              <div className="font-bold text-slate-800 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-blue-600" />
+                <span>Segmentação & Origem</span>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">
+                  Nome do Grupo de Origem:
+                </label>
+                <input
+                  type="text"
+                  value={customGroupName || currentGroup}
+                  onChange={(e) => setCustomGroupName(e.target.value)}
+                  placeholder="Ex: Grupo Moda e Beleza 1"
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">
+                    Segmento / Nicho:
+                  </label>
+                  <input
+                    type="text"
+                    value={segmentName}
+                    onChange={(e) => {
+                      setSegmentName(e.target.value);
+                      if (!tagName) setTagName(e.target.value);
+                    }}
+                    placeholder="Ex: Moda e Beleza"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-0.5">
+                    Etiqueta (Tag):
+                  </label>
+                  <input
+                    type="text"
+                    value={tagName}
+                    onChange={(e) => setTagName(e.target.value)}
+                    placeholder="Ex: Moda e Beleza"
+                    className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              <span className="text-[10px] text-slate-500 block">
+                🏷️ Esta etiqueta será anexada a todos os contatos salvos.
+              </span>
+            </div>
+
             <button
               onClick={handleSaveContacts}
               disabled={isProcessing || selectedQuantity === 0}
               className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all disabled:opacity-50"
             >
-              {isProcessing ? 'Salvando...' : `SALVAR ${selectedQuantity} CONTATOS`}
+              {isProcessing ? 'Salvando...' : `SALVAR ${selectedQuantity} CONTATOS NO CRM`}
             </button>
           </div>
         )}

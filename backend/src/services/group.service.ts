@@ -66,6 +66,69 @@ export class GroupService {
     });
   }
 
+  static async updateGroup(
+    userId: string,
+    id: string,
+    data: { name?: string; description?: string | null; tagName?: string | null }
+  ) {
+    const existing = await prisma.group.findFirst({
+      where: { id, userId }
+    });
+    if (!existing) {
+      throw new Error('Grupo não encontrado');
+    }
+
+    const updateData: any = {};
+    if (data.name && data.name.trim()) updateData.name = data.name.trim();
+    if (data.description !== undefined) updateData.description = data.description;
+
+    const updated = await prisma.group.update({
+      where: { id },
+      data: updateData
+    });
+
+    // Se o nome do grupo mudou, atualiza sourceGroup nos contatos
+    if (data.name && data.name.trim() !== existing.name) {
+      await prisma.contact.updateMany({
+        where: { userId, sourceGroupId: id },
+        data: { sourceGroup: data.name.trim() }
+      });
+    }
+
+    // Se tagName foi informada, cria ou usa a tag e associa a TODOS os contatos do grupo
+    const tagToApply = data.tagName?.trim() || data.description?.trim();
+    if (tagToApply) {
+      const tag = await prisma.tag.upsert({
+        where: {
+          userId_name: { userId, name: tagToApply }
+        },
+        update: {},
+        create: {
+          userId,
+          name: tagToApply,
+          color: '#3b82f6'
+        }
+      });
+
+      const groupContacts = await prisma.groupContact.findMany({
+        where: { groupId: id },
+        select: { contactId: true }
+      });
+
+      for (const gc of groupContacts) {
+        await prisma.contactTag.upsert({
+          where: {
+            contactId_tagId: { contactId: gc.contactId, tagId: tag.id }
+          },
+          create: { contactId: gc.contactId, tagId: tag.id },
+          update: {}
+        });
+      }
+    }
+
+    return updated;
+  }
+
   static async deleteGroup(userId: string, id: string) {
     return prisma.group.delete({
       where: { id, userId }

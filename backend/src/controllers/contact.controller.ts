@@ -80,14 +80,16 @@ export class ContactController {
 
   static async collect(req: AuthenticatedRequest, res: Response) {
     try {
-      const { groupName, waGroupId, destinationGroupId, filters, rawContacts } = req.body;
+      const { groupName, waGroupId, destinationGroupId, segment, tagName, filters, rawContacts } = req.body;
       const result = await ContactService.saveCollectedContacts(
         req.user!.id,
         groupName,
         rawContacts,
         filters,
         waGroupId,
-        destinationGroupId
+        destinationGroupId,
+        segment,
+        tagName
       );
       res.status(201).json(result);
     } catch (error: any) {

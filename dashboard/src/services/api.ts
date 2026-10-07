@@ -59,6 +59,7 @@ export const LeadsApi = {
   getGroups: async (): Promise<GroupDTO[]> => (await api.get('/groups')).data,
   getGroup: async (id: string) => (await api.get(`/groups/${id}`)).data,
   createGroup: async (data: { name: string; description?: string }) => (await api.post('/groups', data)).data,
+  updateGroup: async (id: string, data: { name?: string; description?: string; tagName?: string }) => (await api.put(`/groups/${id}`, data)).data,
   deleteGroup: async (id: string) => (await api.delete(`/groups/${id}`)).data,
 
   // Tags

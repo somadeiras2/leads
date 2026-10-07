@@ -18,19 +18,23 @@ describe('FASE 10 & FASE 11: Gerenciador de Campanhas, Lotes e Proteção contra
     testUserId = user.id;
 
     // Cria 125 contatos para testar divisão exata em lotes de 50
-    for (let i = 1; i <= 125; i++) {
-      const c = await prisma.contact.create({
-        data: {
-          userId: testUserId,
-          name: `Contato Campanha ${i}`,
-          phone: `551198000${String(i).padStart(4, '0')}`,
-          identifier: `id_${i}`,
-          status: 'NOVO'
-        }
-      });
-      createdContactIds.push(c.id);
-    }
-  });
+    const contactsData = Array.from({ length: 125 }, (_, idx) => {
+      const i = idx + 1;
+      return {
+        userId: testUserId,
+        name: `Contato Campanha ${i}`,
+        phone: `551198000${String(i).padStart(4, '0')}`,
+        identifier: `id_${i}`,
+        status: 'NOVO' as const
+      };
+    });
+    await prisma.contact.createMany({ data: contactsData });
+    const allCreated = await prisma.contact.findMany({
+      where: { userId: testUserId },
+      select: { id: true }
+    });
+    createdContactIds.push(...allCreated.map(c => c.id));
+  }, 30000);
 
   afterAll(async () => {
     await prisma.campaignContact.deleteMany({ where: { campaign: { userId: testUserId } } });

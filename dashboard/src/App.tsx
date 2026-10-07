@@ -209,8 +209,8 @@ export const App: React.FC = () => {
 
           {activeTab === 'settings' && (
             <SettingsView
-              onTriggerDemo={handleTriggerDemo}
-              isDemoLoading={isDemoLoading}
+              currentUser={user}
+              onUpdateCurrentUser={(updated) => setUser(updated)}
             />
           )}
         </main>

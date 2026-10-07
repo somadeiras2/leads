@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, User as UserIcon, ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
 import { LeadsApi } from '../services/api';
 
 interface LoginPageProps {
@@ -7,8 +7,6 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
-  const [isRegister, setIsRegister] = useState(false);
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState(''); // Senha SEMPRE vazia por padrão
   const [isLoading, setIsLoading] = useState(false);
@@ -19,24 +17,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setErrorMsg('');
 
     if (!email || !password) {
-      setErrorMsg('Por favor, preencha todos os campos.');
-      return;
-    }
-
-    if (isRegister && !name.trim()) {
-      setErrorMsg('Por favor, informe seu nome.');
+      setErrorMsg('Por favor, informe seu e-mail e senha.');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      let data;
-      if (isRegister) {
-        data = await LeadsApi.register(name.trim(), email.trim(), password);
-      } else {
-        data = await LeadsApi.login(email.trim(), password);
-      }
+      const data = await LeadsApi.login(email.trim(), password);
 
       if (data && data.token) {
         localStorage.setItem('grupoleads_token', data.token);
@@ -46,7 +34,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         throw new Error('Resposta de autenticação inválida.');
       }
     } catch (err: any) {
-      const msg = err.response?.data?.error || err.message || 'Erro ao autenticar. Verifique seus dados.';
+      const msg = err.response?.data?.error || err.message || 'Credenciais inválidas. Verifique seu e-mail e senha.';
       setErrorMsg(msg);
     } finally {
       setIsLoading(false);
@@ -72,45 +60,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4">
         <div className="bg-white py-8 px-6 sm:px-10 shadow-xl shadow-slate-200/50 rounded-2xl border border-slate-100">
-          {/* Alternador de Abas: Entrar / Criar Conta */}
-          <div className="flex rounded-xl bg-slate-100 p-1 mb-6">
-            <button
-              type="button"
-              onClick={() => {
-                setIsRegister(false);
-                setErrorMsg('');
-              }}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                !isRegister
-                  ? 'bg-white text-blue-600 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Entrar
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsRegister(true);
-                setErrorMsg('');
-              }}
-              className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${
-                isRegister
-                  ? 'bg-white text-blue-600 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Criar Conta
-            </button>
-          </div>
-
           <h2 className="text-lg font-extrabold text-slate-900 mb-1">
-            {isRegister ? 'Crie sua conta no GRUPOLEADS' : 'Acesse o Painel de Controle'}
+            Acesse o Painel de Controle
           </h2>
           <p className="text-xs text-slate-500 mb-6">
-            {isRegister
-              ? 'Comece a organizar seus contatos de forma ética e profissional.'
-              : 'Informe seu e-mail e senha para gerenciar seus leads e lotes.'}
+            Informe seu e-mail e senha para gerenciar seus contatos, grupos e lotes.
           </p>
 
           {/* Mensagem de Erro */}
@@ -121,28 +75,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {isRegister && (
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Nome Completo
-                </label>
-                <div className="relative">
-                  <UserIcon className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Seu Nome"
-                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
-                  />
-                </div>
-              </div>
-            )}
-
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                E-mail
+                E-mail de Acesso
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -151,7 +86,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seu@email.com"
+                  placeholder="admin@grupoleads.com"
                   className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-xs"
                 />
               </div>
@@ -180,7 +115,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 disabled={isLoading}
                 className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-sm shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <span>{isLoading ? 'Autenticando...' : isRegister ? 'Criar Minha Conta' : 'Acessar Painel'}</span>
+                <span>{isLoading ? 'Autenticando...' : 'Acessar Painel'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -189,7 +124,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           {/* Rodapé Informativo */}
           <div className="mt-6 pt-5 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-500">
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Acesso seguro com criptografia e proteção anti-bloqueio</span>
+            <span>Acesso seguro & administrativo</span>
           </div>
         </div>
       </div>

@@ -31,10 +31,16 @@ api.interceptors.request.use((config) => {
 });
 
 export const LeadsApi = {
-  // Autenticação
+  // Autenticação & Usuários
   login: async (email: string, password: string) => (await api.post('/auth/login', { email, password })).data,
   register: async (name: string, email: string, password: string) => (await api.post('/auth/register', { name, email, password })).data,
   getMe: async () => (await api.get('/auth/me')).data,
+  updateProfile: async (data: { name?: string; email?: string; currentPassword?: string; newPassword?: string }) =>
+    (await api.put('/auth/profile', data)).data,
+  getUsers: async () => (await api.get<Array<{ id: string; name: string; email: string; createdAt: string; _count?: any }>>('/admin/users')).data,
+  createAdminUser: async (data: { name: string; email: string; password: string }) =>
+    (await api.post('/admin/users', data)).data,
+  deleteUser: async (id: string) => (await api.delete(`/admin/users/${id}`)).data,
 
   // Dashboard Stats
   getStats: async (): Promise<DashboardStatsDTO> => (await api.get('/dashboard/stats')).data,

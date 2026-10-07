@@ -36,6 +36,12 @@ router.get('/auth/me', authMiddleware, AuthController.me);
 // Todas as rotas seguintes são protegidas por autenticação multi-usuário
 router.use(authMiddleware);
 
+// Gestão de Perfil & Administradores
+router.put('/auth/profile', AuthController.updateProfile);
+router.get('/admin/users', AuthController.listUsers);
+router.post('/admin/users', AuthController.createAdminUser);
+router.delete('/admin/users/:id', AuthController.deleteUser);
+
 // Contatos & CRM
 router.get('/contacts', ContactController.list);
 router.get('/contacts/:id', ContactController.getById);

@@ -42,12 +42,20 @@ class WhatsAppAssistant {
   private timerSeconds: number = 30 * 60;
   private isTimerRunning: boolean = false;
   private timerInterval: any = null;
+  private scheduledTime: string = '';
+  private scheduledTargetTimestamp: number | null = null;
+  private scheduleTimerInterval: any = null;
+  private scheduledCountdown: string = '';
+  private isScheduled: boolean = false;
 
   init() {
     if (document.getElementById('grupoleads-assistant-root')) return;
 
     // Injeta estilos CSS encapsulados
     this.injectStyles();
+
+    // Restaura agendamento prévio se houver
+    this.restoreScheduledState();
 
     // Cria root do assistente
     this.container = document.createElement('div');
@@ -277,6 +285,21 @@ class WhatsAppAssistant {
         from { opacity: 0; transform: translateY(8px); }
         to { opacity: 1; transform: translateY(0); }
       }
+      @keyframes glPulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(0.97); }
+      }
+      .gl-input {
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        outline: none;
+        background: #ffffff;
+        color: #1e293b;
+      }
+      .gl-input:focus {
+        border-color: #9333ea;
+        box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.15);
+      }
     `;
     document.head.appendChild(styleEl);
   }
@@ -348,6 +371,161 @@ class WhatsAppAssistant {
     if (timerEl) {
       timerEl.textContent = this.formatTimer(this.timerSeconds);
     }
+  }
+
+  private restoreScheduledState() {
+    try {
+      const savedTime = localStorage.getItem('grupoleads_scheduled_time');
+      const savedTarget = localStorage.getItem('grupoleads_scheduled_target');
+      if (savedTime && savedTarget) {
+        const targetMs = parseInt(savedTarget, 10);
+        if (!isNaN(targetMs)) {
+          if (targetMs > Date.now()) {
+            this.scheduledTime = savedTime;
+            this.scheduledTargetTimestamp = targetMs;
+            this.isScheduled = true;
+            this.startScheduleCountdown();
+          } else {
+            localStorage.removeItem('grupoleads_scheduled_time');
+            localStorage.removeItem('grupoleads_scheduled_target');
+          }
+        }
+      }
+    } catch (e) {
+      // Ignora erro de localStorage
+    }
+  }
+
+  private setSchedule(timeStr: string) {
+    if (!timeStr) {
+      this.showToast('Por favor, selecione um horário válido.');
+      return;
+    }
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    if (isNaN(hours) || isNaN(minutes)) {
+      this.showToast('Horário inválido.');
+      return;
+    }
+
+    const now = new Date();
+    const target = new Date();
+    target.setHours(hours, minutes, 0, 0);
+
+    if (target.getTime() <= now.getTime()) {
+      // Se o horário já passou hoje, agenda para o dia seguinte no mesmo horário
+      target.setDate(target.getDate() + 1);
+    }
+
+    this.scheduledTime = timeStr;
+    this.scheduledTargetTimestamp = target.getTime();
+    this.isScheduled = true;
+
+    try {
+      localStorage.setItem('grupoleads_scheduled_time', this.scheduledTime);
+      localStorage.setItem('grupoleads_scheduled_target', String(this.scheduledTargetTimestamp));
+    } catch (e) {}
+
+    this.startScheduleCountdown();
+    this.showToast(`⏰ Início agendado para ${this.scheduledTime}!`);
+    this.render();
+  }
+
+  private cancelSchedule() {
+    this.isScheduled = false;
+    this.scheduledTargetTimestamp = null;
+    this.scheduledCountdown = '';
+    if (this.scheduleTimerInterval) {
+      clearInterval(this.scheduleTimerInterval);
+      this.scheduleTimerInterval = null;
+    }
+    try {
+      localStorage.removeItem('grupoleads_scheduled_time');
+      localStorage.removeItem('grupoleads_scheduled_target');
+    } catch (e) {}
+    this.showToast('Agendamento cancelado.');
+    this.render();
+  }
+
+  private startScheduleCountdown() {
+    if (this.scheduleTimerInterval) clearInterval(this.scheduleTimerInterval);
+
+    const update = () => {
+      if (!this.isScheduled || !this.scheduledTargetTimestamp) {
+        if (this.scheduleTimerInterval) clearInterval(this.scheduleTimerInterval);
+        return;
+      }
+
+      const now = Date.now();
+      const diffMs = this.scheduledTargetTimestamp - now;
+
+      if (diffMs <= 0) {
+        // Horário agendado atingido!
+        this.cancelSchedule();
+        this.triggerScheduledStart();
+      } else {
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+        this.scheduledCountdown = `${hours > 0 ? `${hours}h ` : ''}${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`;
+        
+        const el = document.getElementById('gl-schedule-countdown');
+        if (el) {
+          el.textContent = `Inicia em: ${this.scheduledCountdown}`;
+        }
+      }
+    };
+
+    update();
+    this.scheduleTimerInterval = setInterval(update, 1000);
+  }
+
+  private triggerScheduledStart() {
+    this.showToast('🚀 Horário agendado atingido! Iniciando operação...');
+    this.playChime();
+
+    // Abre drawer se estiver fechado
+    if (!this.isOpen) {
+      this.isOpen = true;
+      this.render();
+    }
+
+    // Inicia cadência se não estiver ativa
+    if (!this.isTimerRunning) {
+      this.toggleTimer();
+    }
+
+    // Abre Adicionar Participante no WhatsApp
+    this.openWhatsAppAddMember();
+
+    // Insere o primeiro contato pendente após 1.5s
+    setTimeout(() => {
+      this.insertNextPendingContact();
+    }, 1500);
+  }
+
+  private playChime() {
+    try {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.5);
+    } catch (e) {}
+  }
+
+  private getDefaultScheduleTime(): string {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() + 10);
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
   }
 
   // Preenche telefone e foca no WhatsApp Web
@@ -643,6 +821,44 @@ class WhatsAppAssistant {
               </div>
             </div>
 
+            <!-- Agendamento de Horário de Início -->
+            <div class="gl-card" style="background: #faf5ff; border-color: #e9d5ff;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <div style="font-size: 12px; font-weight: 700; color: #7e22ce; display: flex; align-items: center; gap: 5px;">
+                  <span>⏰</span> Programar Horário de Início
+                </div>
+                ${this.isScheduled ? `
+                  <span class="gl-badge gl-badge-rose" style="font-size: 10px; animation: glPulse 1.5s infinite;">
+                    AGENDADO
+                  </span>
+                ` : ''}
+              </div>
+
+              ${this.isScheduled ? `
+                <div style="background: #ffffff; border: 1px solid #d8b4fe; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px;">
+                  <div style="font-size: 11px; color: #6b21a8; font-weight: 600;">
+                    Disparo automático às: <strong style="font-size: 12px; color: #581c87;">${this.scheduledTime}</strong>
+                  </div>
+                  <div id="gl-schedule-countdown" style="font-size: 13px; font-family: monospace; font-weight: 800; color: #9333ea; margin-top: 3px;">
+                    Inicia em: ${this.scheduledCountdown || 'calculando...'}
+                  </div>
+                </div>
+                <button id="gl-cancel-schedule-btn" class="gl-btn gl-btn-outline" style="width: 100%; font-size: 11px; padding: 5px 8px; border-color: #f43f5e; color: #e11d48;">
+                  ✖ Cancelar Agendamento
+                </button>
+              ` : `
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  <input type="time" id="gl-schedule-time-input" value="${this.scheduledTime || this.getDefaultScheduleTime()}" class="gl-input" style="flex: 1; padding: 5px 8px; font-size: 13px; font-family: monospace; font-weight: 600;" />
+                  <button id="gl-set-schedule-btn" class="gl-btn" style="background: #9333ea; color: #ffffff; font-size: 11px; padding: 6px 12px; font-weight: 700; cursor: pointer;">
+                    ⏰ Agendar
+                  </button>
+                </div>
+                <div style="font-size: 10px; color: #7e22ce; margin-top: 6px; line-height: 1.3;">
+                  Ao atingir o horário definido, a cadência e a inclusão iniciam automaticamente.
+                </div>
+              `}
+            </div>
+
             <!-- Ações Rápidas de Inclusão -->
             <div style="display: flex; gap: 6px;">
               <button id="gl-open-add-member-btn" class="gl-btn gl-btn-primary" style="flex: 1; font-size: 11px;">
@@ -732,6 +948,27 @@ class WhatsAppAssistant {
     document.getElementById('gl-timer-reset-btn')?.addEventListener('click', () => this.resetTimer(30));
     document.getElementById('gl-open-add-member-btn')?.addEventListener('click', () => this.openWhatsAppAddMember());
     document.getElementById('gl-copy-all-btn')?.addEventListener('click', () => this.copyAllPhones());
+
+    // Eventos do Agendamento
+    document.getElementById('gl-set-schedule-btn')?.addEventListener('click', () => {
+      const input = document.getElementById('gl-schedule-time-input') as HTMLInputElement | null;
+      if (input?.value) {
+        this.setSchedule(input.value);
+      } else {
+        this.showToast('Selecione um horário válido.');
+      }
+    });
+
+    document.getElementById('gl-schedule-time-input')?.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') {
+        const input = e.target as HTMLInputElement;
+        if (input.value) this.setSchedule(input.value);
+      }
+    });
+
+    document.getElementById('gl-cancel-schedule-btn')?.addEventListener('click', () => {
+      this.cancelSchedule();
+    });
 
     // Eventos nos contatos
     this.container?.querySelectorAll('button[data-action="autofill"]').forEach(btn => {

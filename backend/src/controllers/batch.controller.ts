@@ -76,4 +76,46 @@ export class BatchController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  static async getAll(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { campaignId } = req.query;
+      const data = await BatchService.getAllBatchesCombined(req.user!.id, campaignId as string | undefined);
+      if (!data) {
+        res.status(404).json({ error: 'Nenhum lote encontrado para esta campanha' });
+        return;
+      }
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async getSelected(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { batchIds } = req.body;
+      if (!batchIds || !Array.isArray(batchIds) || batchIds.length === 0) {
+        res.status(400).json({ error: 'Lista de batchIds é obrigatória' });
+        return;
+      }
+      const data = await BatchService.getSelectedBatchesCombined(req.user!.id, batchIds);
+      if (!data) {
+        res.status(404).json({ error: 'Lotes não encontrados' });
+        return;
+      }
+      res.json(data);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async listBatches(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { campaignId } = req.query;
+      const list = await BatchService.listCampaignBatches(req.user!.id, campaignId as string | undefined);
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
 }

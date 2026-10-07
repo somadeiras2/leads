@@ -73,6 +73,9 @@ router.delete('/campaigns/:id', CampaignController.delete);
 
 // Lotes & Execução Manual
 router.get('/batches/active', BatchController.getActive);
+router.get('/batches/all', BatchController.getAll);
+router.post('/batches/selected', BatchController.getSelected);
+router.get('/batches/list', BatchController.listBatches);
 router.get('/batches/next', BatchController.getNextBatch);
 router.get('/batches/:id', BatchController.getById);
 router.put('/batches/contacts/:contactId', validateBody(batchContactUpdateSchema), BatchController.updateContactStatus);

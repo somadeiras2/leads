@@ -6,6 +6,11 @@ const BACKEND_URL = 'https://grupoleads-api.onrender.com/api';
 interface BatchContact {
   id: string;
   status: string;
+  batchId?: string;
+  batch?: {
+    id: string;
+    batchNumber: number;
+  };
   contact?: {
     id: string;
     name: string;
@@ -13,15 +18,29 @@ interface BatchContact {
   };
 }
 
+interface CampaignBatchSummary {
+  id: string;
+  batchNumber: number;
+  targetSize: number;
+  status: string;
+  _count?: { contacts: number };
+}
+
 interface BatchData {
   id: string;
   batchNumber: number;
+  title?: string;
+  isAllBatches?: boolean;
+  isSelectedBatches?: boolean;
+  selectedBatchNumbers?: number[];
   campaignId: string;
   campaign?: {
+    id?: string;
     name: string;
     intervalMinutes?: number;
     sourceGroup?: { name: string };
     destinationGroup?: { name: string };
+    batches?: CampaignBatchSummary[];
   };
   contacts: BatchContact[];
   stats?: {
@@ -38,6 +57,16 @@ class WhatsAppAssistant {
   private container: HTMLDivElement | null = null;
   private isOpen: boolean = false;
   private currentBatch: BatchData | null = null;
+  private availableBatches: CampaignBatchSummary[] = [];
+  private selectedScopeMode: 'ALL' | 'SINGLE' | 'CUSTOM' = 'ALL';
+  private selectedBatchId: string = '';
+  private selectedCustomBatchIds: string[] = [];
+  private isFilterModalOpen: boolean = false;
+
+  private isAutoInserting: boolean = false;
+  private autoInsertTimer: any = null;
+  private autoInsertDelaySeconds: number = 3;
+
   private isLoading: boolean = false;
   private timerSeconds: number = 30 * 60;
   private isTimerRunning: boolean = false;
@@ -54,7 +83,8 @@ class WhatsAppAssistant {
     // Injeta estilos CSS encapsulados
     this.injectStyles();
 
-    // Restaura agendamento prévio se houver
+    // Restaura configurações salvas de escopo e agendamento
+    this.restoreScopeState();
     this.restoreScheduledState();
 
     // Cria root do assistente
@@ -300,8 +330,58 @@ class WhatsAppAssistant {
         border-color: #9333ea;
         box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.15);
       }
+      .gl-batch-tag {
+        display: inline-block;
+        background: #f1f5f9;
+        color: #475569;
+        font-size: 10px;
+        font-weight: 800;
+        padding: 1px 5px;
+        border-radius: 4px;
+        border: 1px solid #cbd5e1;
+      }
     `;
     document.head.appendChild(styleEl);
+  }
+
+  private restoreScopeState() {
+    try {
+      const savedMode = localStorage.getItem('grupoleads_scope_mode') as 'ALL' | 'SINGLE' | 'CUSTOM' | null;
+      if (savedMode) this.selectedScopeMode = savedMode;
+      const savedBatchId = localStorage.getItem('grupoleads_scope_batch_id');
+      if (savedBatchId) this.selectedBatchId = savedBatchId;
+      const savedCustom = localStorage.getItem('grupoleads_scope_custom_ids');
+      if (savedCustom) {
+        this.selectedCustomBatchIds = JSON.parse(savedCustom);
+      }
+      const savedDelay = localStorage.getItem('grupoleads_auto_delay');
+      if (savedDelay) {
+        this.autoInsertDelaySeconds = parseInt(savedDelay, 10) || 3;
+      }
+    } catch (e) {}
+  }
+
+  private setScope(mode: 'ALL' | 'SINGLE' | 'CUSTOM', batchId?: string) {
+    this.selectedScopeMode = mode;
+    if (batchId) this.selectedBatchId = batchId;
+    try {
+      localStorage.setItem('grupoleads_scope_mode', mode);
+      if (batchId) localStorage.setItem('grupoleads_scope_batch_id', batchId);
+    } catch (e) {}
+    this.loadActiveBatch();
+  }
+
+  private getScopeTitle(): string {
+    if (!this.currentBatch) return 'Nenhum Lote Ativo';
+    if (this.selectedScopeMode === 'ALL' || this.currentBatch.isAllBatches) {
+      const batchCount = this.availableBatches.length || 'Todos';
+      return `TODOS OS LOTES (${batchCount} Lotes — ${this.currentBatch.stats?.total || this.currentBatch.contacts.length} Contatos)`;
+    }
+    if (this.selectedScopeMode === 'CUSTOM' || this.currentBatch.isSelectedBatches) {
+      const count = this.selectedCustomBatchIds.length || this.currentBatch.selectedBatchNumbers?.length || 0;
+      return `LOTES SELECIONADOS (${count} Lotes — ${this.currentBatch.stats?.total || this.currentBatch.contacts.length} Contatos)`;
+    }
+    return `LOTE ${String(this.currentBatch.batchNumber).padStart(2, '0')} — ${this.currentBatch.stats?.total || this.currentBatch.contacts.length} Contatos`;
   }
 
   async loadActiveBatch() {
@@ -309,19 +389,40 @@ class WhatsAppAssistant {
     this.render();
 
     try {
-      // 1. Tenta carregar lote ativo do backend
-      const res = await fetch(`${BACKEND_URL}/batches/active`);
+      let url = `${BACKEND_URL}/batches/active`;
+      let postBody: any = null;
+
+      if (this.selectedScopeMode === 'ALL') {
+        url = `${BACKEND_URL}/batches/all`;
+      } else if (this.selectedScopeMode === 'CUSTOM' && this.selectedCustomBatchIds.length > 0) {
+        url = `${BACKEND_URL}/batches/selected`;
+        postBody = JSON.stringify({ batchIds: this.selectedCustomBatchIds });
+      } else if (this.selectedScopeMode === 'SINGLE' && this.selectedBatchId) {
+        url = `${BACKEND_URL}/batches/${this.selectedBatchId}`;
+      }
+
+      const res = postBody
+        ? await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: postBody
+          })
+        : await fetch(url);
+
       if (res.ok) {
         const data = await res.json();
-        if (data && data.id) {
+        if (data && (data.id || data.contacts)) {
           this.currentBatch = data;
+          if (data.campaign?.batches && data.campaign.batches.length > 0) {
+            this.availableBatches = data.campaign.batches;
+          }
           if (data.campaign?.intervalMinutes) {
             this.timerSeconds = data.campaign.intervalMinutes * 60;
           }
         }
       }
     } catch (err) {
-      console.warn('[GRUPOLEADS] Não foi possível conectar ao backend local:', err);
+      console.warn('[GRUPOLEADS] Não foi possível carregar lotes do backend:', err);
     } finally {
       this.isLoading = false;
       this.render();
@@ -526,6 +627,63 @@ class WhatsAppAssistant {
     const h = String(d.getHours()).padStart(2, '0');
     const m = String(d.getMinutes()).padStart(2, '0');
     return `${h}:${m}`;
+  }
+
+  private startAutoInsert() {
+    if (!this.currentBatch?.contacts || this.currentBatch.contacts.length === 0) {
+      this.showToast('Nenhum contato disponível no lote selecionado.');
+      return;
+    }
+
+    const pending = this.currentBatch.contacts.filter(c => c.status === 'PENDENTE');
+    if (pending.length === 0) {
+      this.showToast('Todos os contatos do escopo já foram processados!');
+      return;
+    }
+
+    this.isAutoInserting = true;
+    this.showToast(`🚀 Auto-Inserção iniciada! Intervalo: ${this.autoInsertDelaySeconds}s`);
+    this.openWhatsAppAddMember();
+    this.render();
+
+    setTimeout(() => {
+      this.executeAutoInsertStep();
+    }, 1000);
+  }
+
+  private stopAutoInsert() {
+    this.isAutoInserting = false;
+    if (this.autoInsertTimer) {
+      clearTimeout(this.autoInsertTimer);
+      this.autoInsertTimer = null;
+    }
+    this.showToast('⏸ Inserção automática pausada.');
+    this.render();
+  }
+
+  private async executeAutoInsertStep() {
+    if (!this.isAutoInserting) return;
+
+    const pending = this.currentBatch?.contacts.find(c => c.status === 'PENDENTE');
+    if (!pending || !pending.contact?.phone) {
+      this.isAutoInserting = false;
+      this.playChime();
+      this.showToast('🎉 Todos os contatos deste lote foram inseridos!');
+      this.render();
+      return;
+    }
+
+    this.autofillPhone(pending.contact.phone);
+
+    this.autoInsertTimer = setTimeout(async () => {
+      if (!this.isAutoInserting) return;
+
+      await this.updateContactStatus(pending.id, 'ADICIONADO');
+
+      this.autoInsertTimer = setTimeout(() => {
+        this.executeAutoInsertStep();
+      }, 500);
+    }, this.autoInsertDelaySeconds * 1000);
   }
 
   // Preenche telefone e foca no WhatsApp Web
@@ -775,12 +933,66 @@ class WhatsAppAssistant {
               </div>
             </div>
           ` : `
-            <!-- Info do Lote & Campanha -->
+            <!-- Seletor de Escopo & Info dos Lotes -->
             <div class="gl-card">
-              <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+              <!-- Seletor de Escopo de Lote -->
+              <div style="margin-bottom: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                  <span style="font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">
+                    📦 Selecionar Lote(s):
+                  </span>
+                  <button id="gl-toggle-filter-modal-btn" class="gl-btn gl-btn-outline" style="padding: 2px 7px; font-size: 10px;" title="Escolher múltiplos lotes específicos">
+                    ${this.isFilterModalOpen ? '▲ Fechar' : '⚙️ Escolher Lotes'}
+                  </button>
+                </div>
+
+                <select id="gl-scope-selector" class="gl-input" style="width: 100%; padding: 6px 8px; font-size: 12px; font-weight: 700; color: #0f172a; cursor: pointer; border: 1.5px solid #94a3b8; border-radius: 6px;">
+                  <option value="ALL" ${this.selectedScopeMode === 'ALL' ? 'selected' : ''}>
+                    🌟 TODOS OS LOTES (${this.availableBatches.length || 'Todos'} lotes • ${batch.campaign?.name || 'Campanha'})
+                  </option>
+                  ${this.availableBatches.map(b => `
+                    <option value="${b.id}" ${this.selectedScopeMode === 'SINGLE' && this.selectedBatchId === b.id ? 'selected' : ''}>
+                      📦 Lote ${String(b.batchNumber).padStart(2, '0')} (${b.targetSize || b._count?.contacts || 20} contatos)
+                    </option>
+                  `).join('')}
+                  <option value="CUSTOM" ${this.selectedScopeMode === 'CUSTOM' ? 'selected' : ''}>
+                    🎯 Personalizado (${this.selectedCustomBatchIds.length} lotes marcados)
+                  </option>
+                </select>
+              </div>
+
+              <!-- Painel de Seleção Personalizada (se aberto) -->
+              ${this.isFilterModalOpen ? `
+                <div style="background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
+                  <div style="font-size: 11px; font-weight: 800; color: #1e293b; margin-bottom: 6px;">
+                    Marque os lotes que deseja incluir na operação:
+                  </div>
+                  <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+                    <button id="gl-check-all-btn" class="gl-btn gl-btn-outline" style="flex: 1; font-size: 10px; padding: 3px;">✔ Marcar Todos</button>
+                    <button id="gl-uncheck-all-btn" class="gl-btn gl-btn-outline" style="flex: 1; font-size: 10px; padding: 3px;">✖ Desmarcar</button>
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; max-height: 140px; overflow-y: auto; padding-right: 2px; margin-bottom: 8px;">
+                    ${this.availableBatches.map(b => {
+                      const isChecked = this.selectedCustomBatchIds.includes(b.id);
+                      return `
+                        <label style="display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; background: ${isChecked ? '#dbeafe' : '#ffffff'}; border: 1px solid ${isChecked ? '#2563eb' : '#cbd5e1'}; border-radius: 6px; padding: 5px 4px; cursor: pointer;">
+                          <input type="checkbox" class="gl-batch-chk" value="${b.id}" ${isChecked ? 'checked' : ''} style="cursor: pointer;" />
+                          <span>Lote ${String(b.batchNumber).padStart(2, '0')}</span>
+                        </label>
+                      `;
+                    }).join('')}
+                  </div>
+                  <button id="gl-apply-filter-btn" class="gl-btn gl-btn-primary" style="width: 100%; font-size: 11px; padding: 6px;">
+                    Aplicar Seleção (${this.selectedCustomBatchIds.length} Lotes)
+                  </button>
+                </div>
+              ` : ''}
+
+              <!-- Info do Escopo Atual -->
+              <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px;">
                 <div>
-                  <div style="font-size: 14px; font-weight: 800; color: #0f172a;">
-                    LOTE ${String(batch.batchNumber).padStart(2, '0')} — ${total} Contatos
+                  <div style="font-size: 13px; font-weight: 800; color: #0f172a;">
+                    ${this.getScopeTitle()}
                   </div>
                   <div style="font-size: 11px; color: #64748b;">
                     Campanha: <strong>${batch.campaign?.name || 'Campanha'}</strong>
@@ -790,7 +1002,7 @@ class WhatsAppAssistant {
               </div>
 
               <!-- Barra de Progresso -->
-              <div style="margin: 10px 0 6px 0;">
+              <div style="margin: 8px 0 4px 0;">
                 <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; margin-bottom: 4px;">
                   <span style="color: #2563eb;">Progresso: ${processedCount}/${total} processados</span>
                   <span style="color: #10b981;">${addedCount} adicionados</span>
@@ -859,13 +1071,38 @@ class WhatsAppAssistant {
               `}
             </div>
 
+            <!-- Inserção em Sequência no WhatsApp (Auto-Piloto) -->
+            <div class="gl-card" style="background: #f0fdf4; border-color: #86efac;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <div style="font-size: 12px; font-weight: 800; color: #166534; display: flex; align-items: center; gap: 5px;">
+                  <span>⚡</span> Inserir no WhatsApp (Auto)
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px; font-size: 10px; color: #15803d; font-weight: 700;">
+                  <span>Pausa:</span>
+                  <select id="gl-auto-delay-select" class="gl-input" style="padding: 1px 4px; font-size: 10px; font-weight: 700;">
+                    <option value="2" ${this.autoInsertDelaySeconds === 2 ? 'selected' : ''}>2s</option>
+                    <option value="3" ${this.autoInsertDelaySeconds === 3 ? 'selected' : ''}>3s</option>
+                    <option value="4" ${this.autoInsertDelaySeconds === 4 ? 'selected' : ''}>4s</option>
+                    <option value="5" ${this.autoInsertDelaySeconds === 5 ? 'selected' : ''}>5s</option>
+                  </select>
+                </div>
+              </div>
+
+              <button id="gl-auto-insert-btn" class="gl-btn ${this.isAutoInserting ? 'gl-btn-danger' : 'gl-btn-success'}" style="width: 100%; font-size: 11px; padding: 6px 10px;">
+                ${this.isAutoInserting ? '⏹ Parar Inserção Automática' : `▶ Inserir ${this.selectedScopeMode === 'ALL' ? 'Todos os Lotes' : 'Lotes'} em Sequência`}
+              </button>
+              <div style="font-size: 10px; color: #15803d; margin-top: 5px; line-height: 1.3;">
+                ${this.isAutoInserting ? '🔄 Inserindo contatos automaticamente no WhatsApp Web...' : 'Percorre contato por contato do escopo selecionado e insere no WhatsApp.'}
+              </div>
+            </div>
+
             <!-- Ações Rápidas de Inclusão -->
             <div style="display: flex; gap: 6px;">
               <button id="gl-open-add-member-btn" class="gl-btn gl-btn-primary" style="flex: 1; font-size: 11px;">
                 ➕ Abrir Adicionar no WhatsApp
               </button>
               <button id="gl-copy-all-btn" class="gl-btn gl-btn-outline" style="font-size: 11px;" title="Copiar todos os números">
-                📋 Copiar Todos
+                📋 Copiar Todos (${total})
               </button>
             </div>
 
@@ -886,7 +1123,7 @@ class WhatsAppAssistant {
 
             <!-- Lista de Contatos -->
             <div style="font-size: 12px; font-weight: 700; color: #475569; margin-top: 4px;">
-              Contatos do Lote (${batch.contacts.length}):
+              Contatos do Escopo (${batch.contacts.length}):
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -900,7 +1137,12 @@ class WhatsAppAssistant {
                   <div class="gl-contact-item ${isAdded ? 'added' : isNotAdded ? 'not-added' : ''}">
                     <div style="display: flex; justify-content: space-between; align-items: start;">
                       <div>
-                        <div style="font-weight: 700; font-size: 13px; color: #0f172a;">${name}</div>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                          <span style="font-weight: 700; font-size: 13px; color: #0f172a;">${name}</span>
+                          ${item.batch?.batchNumber ? `
+                            <span class="gl-batch-tag">Lote ${String(item.batch.batchNumber).padStart(2, '0')}</span>
+                          ` : ''}
+                        </div>
                         <div style="font-family: monospace; font-size: 11px; color: #64748b;">+${phone}</div>
                       </div>
                       <span class="gl-badge ${isAdded ? 'gl-badge-green' : isNotAdded ? 'gl-badge-rose' : 'gl-badge-slate'}">
@@ -948,6 +1190,88 @@ class WhatsAppAssistant {
     document.getElementById('gl-timer-reset-btn')?.addEventListener('click', () => this.resetTimer(30));
     document.getElementById('gl-open-add-member-btn')?.addEventListener('click', () => this.openWhatsAppAddMember());
     document.getElementById('gl-copy-all-btn')?.addEventListener('click', () => this.copyAllPhones());
+
+    // Seletor de escopo de lotes
+    document.getElementById('gl-scope-selector')?.addEventListener('change', (e) => {
+      const val = (e.target as HTMLSelectElement).value;
+      if (val === 'ALL') {
+        this.isFilterModalOpen = false;
+        this.setScope('ALL');
+      } else if (val === 'CUSTOM') {
+        this.isFilterModalOpen = true;
+        this.render();
+      } else {
+        this.isFilterModalOpen = false;
+        this.setScope('SINGLE', val);
+      }
+    });
+
+    // Abrir/fechar modal de filtros personalizados
+    document.getElementById('gl-toggle-filter-modal-btn')?.addEventListener('click', () => {
+      this.isFilterModalOpen = !this.isFilterModalOpen;
+      this.render();
+    });
+
+    // Marcar/Desmarcar todos os lotes no filtro
+    document.getElementById('gl-check-all-btn')?.addEventListener('click', () => {
+      this.selectedCustomBatchIds = this.availableBatches.map(b => b.id);
+      this.render();
+    });
+
+    document.getElementById('gl-uncheck-all-btn')?.addEventListener('click', () => {
+      this.selectedCustomBatchIds = [];
+      this.render();
+    });
+
+    // Mudança individual de checkbox
+    this.container?.querySelectorAll('.gl-batch-chk').forEach(chk => {
+      chk.addEventListener('change', (e) => {
+        const input = e.target as HTMLInputElement;
+        const id = input.value;
+        if (input.checked) {
+          if (!this.selectedCustomBatchIds.includes(id)) {
+            this.selectedCustomBatchIds.push(id);
+          }
+        } else {
+          this.selectedCustomBatchIds = this.selectedCustomBatchIds.filter(x => x !== id);
+        }
+        const applyBtn = document.getElementById('gl-apply-filter-btn');
+        if (applyBtn) {
+          applyBtn.textContent = `Aplicar Seleção (${this.selectedCustomBatchIds.length} Lotes)`;
+        }
+      });
+    });
+
+    // Aplicar filtro de lotes personalizados
+    document.getElementById('gl-apply-filter-btn')?.addEventListener('click', () => {
+      if (this.selectedCustomBatchIds.length === 0) {
+        this.showToast('Selecione pelo menos um lote.');
+        return;
+      }
+      this.isFilterModalOpen = false;
+      this.selectedScopeMode = 'CUSTOM';
+      localStorage.setItem('grupoleads_scope_mode', 'CUSTOM');
+      localStorage.setItem('grupoleads_scope_custom_ids', JSON.stringify(this.selectedCustomBatchIds));
+      this.loadActiveBatch();
+    });
+
+    // Auto-Inserção em Sequência
+    document.getElementById('gl-auto-insert-btn')?.addEventListener('click', () => {
+      if (this.isAutoInserting) {
+        this.stopAutoInsert();
+      } else {
+        this.startAutoInsert();
+      }
+    });
+
+    // Delay da auto-inserção
+    document.getElementById('gl-auto-delay-select')?.addEventListener('change', (e) => {
+      const val = parseInt((e.target as HTMLSelectElement).value, 10);
+      if (val) {
+        this.autoInsertDelaySeconds = val;
+        localStorage.setItem('grupoleads_auto_delay', String(val));
+      }
+    });
 
     // Eventos do Agendamento
     document.getElementById('gl-set-schedule-btn')?.addEventListener('click', () => {

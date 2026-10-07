@@ -47,8 +47,24 @@ export class BatchService {
 
     const processed = added + notAdded + error + alreadyInGroup;
 
+    const campaignBatches = await prisma.batch.findMany({
+      where: { campaignId: batch.campaignId },
+      orderBy: { batchNumber: 'asc' },
+      select: {
+        id: true,
+        batchNumber: true,
+        targetSize: true,
+        status: true,
+        _count: { select: { contacts: true } }
+      }
+    });
+
     return {
       ...batch,
+      campaign: {
+        ...batch.campaign,
+        batches: campaignBatches
+      },
       stats: {
         total,
         processed,
@@ -249,5 +265,247 @@ export class BatchService {
     }
 
     return null;
+  }
+
+  /**
+   * Obtém todos os lotes combinados da campanha com lista completa de contatos
+   */
+  static async getAllBatchesCombined(userId: string, campaignId?: string) {
+    let camp = null;
+    if (campaignId) {
+      camp = await prisma.campaign.findFirst({
+        where: { id: campaignId, userId },
+        include: { sourceGroup: true, destinationGroup: true }
+      });
+    } else {
+      camp = await prisma.campaign.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        include: { sourceGroup: true, destinationGroup: true }
+      });
+    }
+
+    if (!camp) return null;
+
+    const campaignBatches = await prisma.batch.findMany({
+      where: { campaignId: camp.id },
+      orderBy: { batchNumber: 'asc' },
+      select: {
+        id: true,
+        batchNumber: true,
+        targetSize: true,
+        status: true,
+        _count: { select: { contacts: true } }
+      }
+    });
+
+    const batchContacts = await prisma.batchContact.findMany({
+      where: { batch: { campaignId: camp.id } },
+      orderBy: [
+        { batch: { batchNumber: 'asc' } },
+        { id: 'asc' }
+      ],
+      include: {
+        contact: {
+          include: {
+            tags: { include: { tag: true } }
+          }
+        },
+        batch: {
+          select: { id: true, batchNumber: true }
+        }
+      }
+    });
+
+    const total = batchContacts.length;
+    let added = 0;
+    let notAdded = 0;
+    let pending = 0;
+    let error = 0;
+    let alreadyInGroup = 0;
+
+    for (const c of batchContacts) {
+      if (c.status === 'ADICIONADO') added++;
+      else if (c.status === 'NAO_ADICIONADO') notAdded++;
+      else if (c.status === 'PENDENTE') pending++;
+      else if (c.status === 'ERRO') error++;
+      else if (c.status === 'JA_NO_GRUPO') alreadyInGroup++;
+    }
+
+    const processed = added + notAdded + error + alreadyInGroup;
+
+    return {
+      id: 'all',
+      batchNumber: 0,
+      isAllBatches: true,
+      title: 'Todos os Lotes',
+      campaignId: camp.id,
+      campaign: {
+        ...camp,
+        batches: campaignBatches
+      },
+      contacts: batchContacts,
+      stats: {
+        total,
+        processed,
+        added,
+        notAdded,
+        pending,
+        error,
+        alreadyInGroup,
+        isCompleted: pending === 0 && total > 0
+      }
+    };
+  }
+
+  /**
+   * Obtém contatos combinados dos lotes selecionados especificamente pelo usuário
+   */
+  static async getSelectedBatchesCombined(userId: string, batchIds: string[]) {
+    if (!batchIds || batchIds.length === 0) return null;
+
+    const batches = await prisma.batch.findMany({
+      where: {
+        id: { in: batchIds },
+        campaign: { userId }
+      },
+      include: {
+        campaign: {
+          include: { sourceGroup: true, destinationGroup: true }
+        }
+      },
+      orderBy: { batchNumber: 'asc' }
+    });
+
+    if (batches.length === 0) return null;
+
+    const campaign = batches[0].campaign;
+
+    const allCampaignBatches = await prisma.batch.findMany({
+      where: { campaignId: campaign.id },
+      orderBy: { batchNumber: 'asc' },
+      select: {
+        id: true,
+        batchNumber: true,
+        targetSize: true,
+        status: true,
+        _count: { select: { contacts: true } }
+      }
+    });
+
+    const batchContacts = await prisma.batchContact.findMany({
+      where: { batchId: { in: batchIds } },
+      orderBy: [
+        { batch: { batchNumber: 'asc' } },
+        { id: 'asc' }
+      ],
+      include: {
+        contact: {
+          include: {
+            tags: { include: { tag: true } }
+          }
+        },
+        batch: {
+          select: { id: true, batchNumber: true }
+        }
+      }
+    });
+
+    const total = batchContacts.length;
+    let added = 0;
+    let notAdded = 0;
+    let pending = 0;
+    let error = 0;
+    let alreadyInGroup = 0;
+
+    for (const c of batchContacts) {
+      if (c.status === 'ADICIONADO') added++;
+      else if (c.status === 'NAO_ADICIONADO') notAdded++;
+      else if (c.status === 'PENDENTE') pending++;
+      else if (c.status === 'ERRO') error++;
+      else if (c.status === 'JA_NO_GRUPO') alreadyInGroup++;
+    }
+
+    const processed = added + notAdded + error + alreadyInGroup;
+
+    return {
+      id: 'selected',
+      batchNumber: -1,
+      isSelectedBatches: true,
+      selectedBatchNumbers: batches.map(b => b.batchNumber),
+      campaignId: campaign.id,
+      campaign: {
+        ...campaign,
+        batches: allCampaignBatches
+      },
+      contacts: batchContacts,
+      stats: {
+        total,
+        processed,
+        added,
+        notAdded,
+        pending,
+        error,
+        alreadyInGroup,
+        isCompleted: pending === 0 && total > 0
+      }
+    };
+  }
+
+  /**
+   * Lista todos os lotes com contadores resumidos
+   */
+  static async listCampaignBatches(userId: string, campaignId?: string) {
+    let campId = campaignId;
+    if (!campId) {
+      const latest = await prisma.campaign.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true }
+      });
+      if (!latest) return [];
+      campId = latest.id;
+    }
+
+    const batches = await prisma.batch.findMany({
+      where: { campaignId: campId, campaign: { userId } },
+      orderBy: { batchNumber: 'asc' },
+      include: {
+        _count: { select: { contacts: true } }
+      }
+    });
+
+    const results = await Promise.all(
+      batches.map(async (b) => {
+        const counts = await prisma.batchContact.groupBy({
+          by: ['status'],
+          where: { batchId: b.id },
+          _count: { _all: true }
+        });
+
+        let added = 0;
+        let notAdded = 0;
+        let pending = 0;
+
+        for (const item of counts) {
+          if (item.status === 'ADICIONADO') added += item._count._all;
+          else if (item.status === 'NAO_ADICIONADO') notAdded += item._count._all;
+          else if (item.status === 'PENDENTE') pending += item._count._all;
+        }
+
+        return {
+          id: b.id,
+          batchNumber: b.batchNumber,
+          targetSize: b.targetSize,
+          status: b.status,
+          total: b._count.contacts,
+          added,
+          notAdded,
+          pending
+        };
+      })
+    );
+
+    return results;
   }
 }

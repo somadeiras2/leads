@@ -29,7 +29,7 @@ export const App: React.FC = () => {
   const [user, setUser] = useState<{ id: string; name: string; email: string } | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loginEmail, setLoginEmail] = useState('admin@grupoleads.com');
-  const [loginPassword, setLoginPassword] = useState('123456');
+  const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isConnected, setIsConnected] = useState(false);

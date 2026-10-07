@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, Plus, LogOut } from 'lucide-react';
+import { ShieldCheck, Plus, LogOut, Download } from 'lucide-react';
 import { Button } from '../common/Button';
 
 interface NavbarProps {
@@ -30,11 +30,16 @@ export const Navbar: React.FC<NavbarProps> = ({
         <h1 className="text-xl font-bold text-slate-900">{title}</h1>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 rounded-full text-xs text-slate-600 font-medium border border-slate-200/60">
-          <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-          <span>Extensão Manifest V3 Conectada</span>
-        </div>
+      <div className="flex items-center gap-3">
+        <a
+          href="/grupoleads-extension.zip"
+          download="grupoleads-extension.zip"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-800 rounded-lg text-xs font-bold border border-emerald-200 transition-all shadow-xs"
+          title="Baixar arquivo da extensão para instalar no Chrome"
+        >
+          <Download className="w-4 h-4 text-emerald-600" />
+          <span>Baixar Extensão (.zip)</span>
+        </a>
 
         <Button
           variant="primary"

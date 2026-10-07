@@ -9,6 +9,7 @@ build
 .next
 out
 *.zip
+!dashboard/public/grupoleads-extension.zip
 
 
 # Local Databases & SQLite

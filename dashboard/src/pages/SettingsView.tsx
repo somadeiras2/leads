@@ -13,7 +13,10 @@ import {
   Trash2,
   KeyRound,
   Mail,
-  Users
+  Users,
+  Download,
+  ExternalLink,
+  Puzzle
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
@@ -209,6 +212,66 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <span>{successMsg}</span>
         </div>
       )}
+
+      {/* SEÇÃO DE DOWNLOAD DA EXTENSÃO */}
+      <Card
+        title={
+          <div className="flex items-center gap-2">
+            <Puzzle className="w-5 h-5 text-emerald-600" />
+            <span>Extensão WhatsApp Web (Google Chrome)</span>
+          </div>
+        }
+        subtitle="Baixe a extensão oficial Manifest V3 pré-configurada e pronta para conectar ao seu sistema"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-emerald-50/70 rounded-xl border border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-sm text-emerald-900">Extensão Manifest V3 Conectada à Nuvem</span>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-800 text-[10px] font-bold">100% Configurada</span>
+              </div>
+              <p className="text-xs text-emerald-700 mt-1">
+                A extensão já vem apontando diretamente para o seu servidor seguro (Render & Supabase). Não requer nenhuma configuração manual de URL.
+              </p>
+            </div>
+            <a
+              href="/grupoleads-extension.zip"
+              download="grupoleads-extension.zip"
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-xs shadow-md shadow-emerald-500/20 transition-all shrink-0"
+            >
+              <Download className="w-4 h-4" />
+              <span>Baixar Extensão (.zip)</span>
+            </a>
+          </div>
+
+          <div className="border-t border-slate-100 pt-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+              Como instalar em 4 passos simples:
+            </h4>
+            <ol className="space-y-2 text-xs text-slate-600">
+              <li className="flex items-start gap-2">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</span>
+                <span>Clique no botão verde acima e <strong>extraia (descompacte)</strong> o arquivo <code>grupoleads-extension.zip</code> em uma pasta do seu computador.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">2</span>
+                <span>Abra o Google Chrome e digite na barra de endereços: <code className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-800 font-mono">chrome://extensions</code></span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">3</span>
+                <span>No canto superior direito da tela de extensões, ative a opção <strong>"Modo do desenvolvedor"</strong>.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-[10px] shrink-0 mt-0.5">4</span>
+                <span>Clique no botão <strong>"Carregar sem compactação"</strong> (canto superior esquerdo) e selecione a pasta onde você extraiu a extensão.</span>
+              </li>
+            </ol>
+            <div className="mt-3 p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[11px] text-slate-500">
+              💡 <strong>Dica:</strong> Ao abrir o WhatsApp Web (<a href="https://web.whatsapp.com" target="_blank" rel="noreferrer" className="text-blue-600 underline font-semibold">web.whatsapp.com</a>), o assistente inteligente do GRUPOLEADS aparecerá automaticamente no topo da página.
+            </div>
+          </div>
+        </div>
+      </Card>
 
       {/* SEÇÃO 1: MINHA CONTA & ALTERAÇÃO DE SENHA */}
       <Card

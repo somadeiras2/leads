@@ -115,13 +115,13 @@ export class GroupService {
         select: { contactId: true }
       });
 
-      for (const gc of groupContacts) {
-        await prisma.contactTag.upsert({
-          where: {
-            contactId_tagId: { contactId: gc.contactId, tagId: tag.id }
-          },
-          create: { contactId: gc.contactId, tagId: tag.id },
-          update: {}
+      if (groupContacts.length > 0) {
+        await prisma.contactTag.createMany({
+          data: groupContacts.map(gc => ({
+            contactId: gc.contactId,
+            tagId: tag.id
+          })),
+          skipDuplicates: true
         });
       }
     }

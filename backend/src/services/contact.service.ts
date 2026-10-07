@@ -160,6 +160,7 @@ export class ContactService {
     );
 
     let savedCount = 0;
+    const savedContactIds: string[] = [];
     const now = new Date();
 
     for (const item of eligibleContacts) {
@@ -208,35 +209,26 @@ export class ContactService {
         savedCount++;
       }
 
-      // Relaciona com o grupo (sem duplicar junção)
-      await prisma.groupContact.upsert({
-        where: {
-          groupId_contactId: {
-            groupId: group.id,
-            contactId
-          }
-        },
-        create: {
+      savedContactIds.push(contactId);
+    }
+
+    // Relaciona em lote com o grupo e com a etiqueta (1 única query de alta performance)
+    if (savedContactIds.length > 0) {
+      await prisma.groupContact.createMany({
+        data: savedContactIds.map(cId => ({
           groupId: group.id,
-          contactId
-        },
-        update: {}
+          contactId: cId
+        })),
+        skipDuplicates: true
       });
 
-      // Associa a etiqueta (tag) de segmentação ao contato
       if (tagId) {
-        await prisma.contactTag.upsert({
-          where: {
-            contactId_tagId: {
-              contactId,
-              tagId
-            }
-          },
-          create: {
-            contactId,
+        await prisma.contactTag.createMany({
+          data: savedContactIds.map(cId => ({
+            contactId: cId,
             tagId
-          },
-          update: {}
+          })),
+          skipDuplicates: true
         });
       }
     }

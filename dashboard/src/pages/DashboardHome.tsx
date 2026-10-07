@@ -43,7 +43,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   onNavigateTab,
   onDismissCampaignPrompt
 }) => {
-  if (isLoading || !stats) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -51,10 +51,23 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     );
   }
 
+  const safeStats: DashboardStatsDTO = stats || {
+    totalContacts: 0,
+    uniqueContacts: 0,
+    totalGroups: 0,
+    newContacts: 0,
+    activeCampaigns: 0,
+    pendingBatches: 0,
+    contactsByGroup: [],
+    contactsGrowth: [],
+    contactsByStatus: [],
+    campaignPerformance: []
+  };
+
   const kpis = [
     {
       title: 'CONTATOS TOTAIS',
-      value: stats.totalContacts.toLocaleString('pt-BR'),
+      value: safeStats.totalContacts.toLocaleString('pt-BR'),
       change: 'Base consolidada',
       icon: Users,
       color: 'text-blue-600',
@@ -62,7 +75,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     },
     {
       title: 'CONTATOS ÚNICOS',
-      value: stats.uniqueContacts.toLocaleString('pt-BR'),
+      value: (safeStats.uniqueContacts || 0).toLocaleString('pt-BR'),
       change: 'Deduplicados',
       icon: UserCheck,
       color: 'text-emerald-600',
@@ -70,7 +83,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     },
     {
       title: 'GRUPOS',
-      value: stats.totalGroups.toLocaleString('pt-BR'),
+      value: (safeStats.totalGroups || 0).toLocaleString('pt-BR'),
       change: 'Origem mapeada',
       icon: FolderKanban,
       color: 'text-indigo-600',
@@ -78,7 +91,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     },
     {
       title: 'NOVOS',
-      value: stats.newContacts.toLocaleString('pt-BR'),
+      value: (safeStats.newContacts || 0).toLocaleString('pt-BR'),
       change: 'Aguardando ação',
       icon: UserPlus,
       color: 'text-amber-600',
@@ -86,7 +99,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     },
     {
       title: 'CAMPANHAS',
-      value: stats.activeCampaigns.toLocaleString('pt-BR'),
+      value: (safeStats.activeCampaigns || 0).toLocaleString('pt-BR'),
       change: 'Ativas no momento',
       icon: Layers,
       color: 'text-purple-600',
@@ -94,7 +107,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     },
     {
       title: 'LOTES PENDENTES',
-      value: stats.pendingBatches.toLocaleString('pt-BR'),
+      value: (safeStats.pendingBatches || 0).toLocaleString('pt-BR'),
       change: 'Prontos para revisão',
       icon: Clock,
       color: 'text-rose-600',
@@ -105,7 +118,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
   return (
     <div className="space-y-6">
       {/* 24. CONTINUIDADE: Banner de Campanha em Andamento */}
-      {stats.activeCampaignPrompt && (
+      {safeStats.activeCampaignPrompt && (
         <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg shadow-blue-500/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center shrink-0 border border-white/20">
@@ -117,11 +130,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                   Continuidade Ativa
                 </span>
                 <span className="text-xs text-blue-100">
-                  {stats.activeCampaignPrompt.pendingBatchesCount} lotes restantes
+                  {safeStats.activeCampaignPrompt.pendingBatchesCount} lotes restantes
                 </span>
               </div>
               <h2 className="text-lg font-bold mt-1">
-                Você possui uma campanha em andamento: “{stats.activeCampaignPrompt.campaignName}”
+                Você possui uma campanha em andamento: “{safeStats.activeCampaignPrompt.campaignName}”
               </h2>
               <p className="text-xs text-blue-100 mt-0.5">
                 Continue o trabalho de revisão e inclusão manual exatamente de onde parou.
@@ -140,7 +153,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => onNavigateToCampaign(stats.activeCampaignPrompt!.campaignId)}
+              onClick={() => onNavigateToCampaign(safeStats.activeCampaignPrompt!.campaignId)}
               className="bg-white text-blue-700 hover:bg-blue-50 font-semibold shadow-md"
               icon={<ArrowRight className="w-4 h-4" />}
             >
@@ -192,7 +205,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         >
           <div className="h-64 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.contactsGrowth}>
+              <AreaChart data={safeStats.contactsGrowth || []}>
                 <defs>
                   <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#2563eb" stopOpacity={0.25} />
@@ -237,7 +250,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         >
           <div className="h-64 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.contactsByGroup}>
+              <BarChart data={safeStats.contactsByGroup || []}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis
                   dataKey="groupName"
@@ -273,9 +286,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         subtitle="Registro manual do progresso: adicionados, não adicionados e pendentes"
       >
         <div className="h-64 w-full pt-2">
-          {stats.campaignPerformance.length > 0 ? (
+          {(safeStats.campaignPerformance || []).length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={stats.campaignPerformance}>
+              <BarChart data={safeStats.campaignPerformance}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis
                   dataKey="name"

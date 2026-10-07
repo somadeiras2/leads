@@ -9,10 +9,24 @@ import { BatchRunnerView } from './pages/BatchRunnerView';
 import { ImportExportView } from './pages/ImportExportView';
 import { HistoryView } from './pages/HistoryView';
 import { SettingsView } from './pages/SettingsView';
+import { LoginPage } from './pages/LoginPage';
 import { LeadsApi } from './services/api';
 import { DashboardStatsDTO } from '@grupoleads/shared';
 
 export const App: React.FC = () => {
+  const [user, setUser] = useState<{ id: string; name: string; email: string } | null>(() => {
+    const savedUser = localStorage.getItem('grupoleads_user');
+    const token = localStorage.getItem('grupoleads_token');
+    if (savedUser && token) {
+      try {
+        return JSON.parse(savedUser);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
   const [stats, setStats] = useState<DashboardStatsDTO | null>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
@@ -37,8 +51,17 @@ export const App: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchStats();
-  }, []);
+    if (user) {
+      fetchStats();
+    }
+  }, [user]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('grupoleads_token');
+    localStorage.removeItem('grupoleads_user');
+    setUser(null);
+    setStats(null);
+  };
 
   const handleTriggerDemo = async () => {
     setIsDemoLoading(true);
@@ -84,6 +107,17 @@ export const App: React.FC = () => {
     settings: 'Configurações & Privacidade'
   };
 
+  // Se o usuário não estiver autenticado, exibe a tela de login
+  if (!user) {
+    return (
+      <LoginPage
+        onLoginSuccess={(loggedInUser) => {
+          setUser(loggedInUser);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       {/* Sidebar Fixo */}
@@ -93,14 +127,14 @@ export const App: React.FC = () => {
           setActiveTab(tab);
           if (tab !== 'batches') setActiveBatchId(null);
         }}
-        onTriggerDemo={handleTriggerDemo}
-        isDemoLoading={isDemoLoading}
       />
 
       {/* Conteúdo Principal com Scroll */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         <Navbar
           title={titles[activeTab]}
+          user={user}
+          onLogout={handleLogout}
           onOpenNewCampaignModal={() => {
             setCampaignPrefillContactIds([]);
             setCampaignPrefillGroupId(undefined);

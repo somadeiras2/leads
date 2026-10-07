@@ -17,15 +17,13 @@ export type NavTab = 'dashboard' | 'crm' | 'groups' | 'campaigns' | 'batches' | 
 interface SidebarProps {
   activeTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
-  onTriggerDemo: () => void;
+  onTriggerDemo?: () => void;
   isDemoLoading?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onSelectTab,
-  onTriggerDemo,
-  isDemoLoading = false
 }) => {
   const navItems = [
     { id: 'dashboard' as NavTab, label: 'Visão Geral', icon: LayoutDashboard },
@@ -70,17 +68,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </nav>
 
-      {/* Seção Inferior: Modo Demo & Compliance */}
-      <div className="p-4 border-t border-slate-100 space-y-3 bg-slate-50/50">
-        <button
-          onClick={onTriggerDemo}
-          disabled={isDemoLoading}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-semibold text-xs shadow-sm shadow-amber-500/20 transition-all disabled:opacity-50"
-        >
-          <Sparkles className="w-4 h-4 shrink-0" />
-          <span>{isDemoLoading ? 'Gerando dados...' : 'MODO DEMO (500 contatos)'}</span>
-        </button>
-
+      {/* Seção Inferior: Compliance Ético */}
+      <div className="p-4 border-t border-slate-100 bg-slate-50/50">
         <div className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-emerald-50/80 border border-emerald-100 text-[11px] text-emerald-800">
           <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
           <span>100% Ético & Seguro (Sem spam ou disparos)</span>
